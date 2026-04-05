@@ -17,6 +17,33 @@ model: inherit
 
 **输出**: 设定违规、战力冲突、逻辑不一致的结构化报告。
 
+### 同人模式扩展
+
+当 `state.json` 中 `project_info.mode == "fan_fiction"` 时，额外执行 Canon 设定对照：
+
+**额外加载**：
+1. `.webnovel/canon/world.md`（原作世界观）
+2. `.webnovel/canon/power_system.md`（原作力量体系）
+3. `设定集/Canon偏离声明.md`
+
+**Canon 设定检查逻辑**：
+- 读取 `fan_fiction_meta.canon_retained`（保留清单）→ 严格对照 Canon 设定检查
+- 读取 `fan_fiction_meta.canon_modified`（修改清单）→ 跳过 Canon 对照，按 AU 设定集检查
+- 新增设定 → 检查是否与 Canon 保留设定矛盾
+
+**Canon 一致性示例**：
+```
+❌ Canon Consistency Violation:
+保留设定：斗气等级体系（斗者→斗师→大斗师→斗灵→斗王...）
+当前章节：主角从"斗者"直接突破到"大斗师"
+判定：❌ 违反 Canon 保留的力量体系等级顺序
+
+✓ AU Modified Setting:
+修改设定：世界背景改为现代都市
+当前章节：描写现代都市的高楼大厦
+判定：✓ 符合 AU 改造声明，不对照 Canon 世界观
+```
+
 ## 执行流程
 
 ### 第一步: 加载参考资料
@@ -38,6 +65,7 @@ model: inherit
 2. `{project_root}/.webnovel/state.json`（主角当前状态）
 3. `设定集/`（世界观圣经）
 4. `大纲/`（对照上下文）
+5. `.webnovel/canon/` 原作参照资料和 `设定集/Canon偏离声明.md`（同人模式）
 
 ### 第二步: 三层一致性检查
 
@@ -226,3 +254,4 @@ python -X utf8 "${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT is required}/scripts/we
 - 所有新实体与现有世界观一致
 - 地点和时间线过渡合乎逻辑
 - 报告为润色步骤提供具体修复建议
+- 同人模式：Canon 保留设定的违规判定为高优先级

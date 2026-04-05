@@ -245,6 +245,9 @@ def main() -> None:
     p_init = sub.add_parser("init", help="转发到 init_project.py（初始化项目）")
     p_init.add_argument("args", nargs=argparse.REMAINDER)
 
+    p_canon_parse = sub.add_parser("canon-parse", help="解析原作 TXT 文件（同人模式）")
+    p_canon_parse.add_argument("args", nargs=argparse.REMAINDER)
+
     p_extract_context = sub.add_parser("extract-context", help="转发到 extract_chapter_context.py")
     p_extract_context.add_argument("--chapter", type=int, required=True, help="目标章节号")
     p_extract_context.add_argument("--format", choices=["text", "json"], default="text", help="输出格式")
@@ -270,6 +273,10 @@ def main() -> None:
     # init 是创建项目，不应该依赖/注入已存在 project_root
     if tool == "init":
         raise SystemExit(_run_script("init_project.py", rest))
+
+    # canon-parse 解析原作 TXT，不依赖已存在 project_root
+    if tool == "canon-parse":
+        raise SystemExit(_run_script("canon_parser.py", rest))
 
     # 其余工具：统一解析 project_root 后前置给下游
     project_root = _resolve_root(args.project_root)

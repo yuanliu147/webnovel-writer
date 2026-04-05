@@ -11,6 +11,7 @@ allowed-tools: Read Write Edit Grep Bash Task AskUserQuestion WebSearch WebFetch
 - 通过结构化交互收集足够信息，避免“先生成再返工”。
 - 产出可落地项目骨架：`.webnovel/state.json`、`设定集/*`、`大纲/总纲.md`、`.webnovel/idea_bank.json`。
 - 保证后续 `/webnovel-plan` 与 `/webnovel-write` 可直接运行。
+- 支持同人模式：导入原作 TXT，AI 解析提取 Canon 资料，生成偏离声明，建立同人项目。
 
 ## 执行原则
 
@@ -122,6 +123,110 @@ allowed-tools: Read Write Edit Grep Bash Task AskUserQuestion WebSearch WebFetch
   - 对题材信息存在明显不确定。
 
 ## 交互流程（Deep）
+
+### 模式选择（同人 vs 原创）
+
+在 Step 0 预检完成后、Step 1 开始前，询问用户创作模式：
+
+**选项**：
+- **原创模式**（默认）：按原有 Step 1-6 流程执行。
+- **同人模式**：进入同人专属流程。
+
+若选择**同人模式**，替换 Step 1-6 为以下同人流程：
+
+---
+
+### 同人 Step 1：导入原作
+
+收集项：
+- 原作名称
+- 原作 TXT 文件路径（用户提供）
+- 原作题材类型
+
+执行：
+```bash
+python "${SCRIPTS_DIR}/webnovel.py" canon-parse \
+  "{canon_txt_path}" \
+  "{project_root}" \
+  --source-title "{canon_source_title}" \
+  --encoding utf-8
+```
+
+输出：
+- `.webnovel/canon/source_meta.json`（原作元信息）
+- `.webnovel/canon/` 目录结构
+
+### 同人 Step 2：AI 解析提取 Canon 资料
+
+基于原作 TXT 内容，AI 逐步提取并填充：
+
+1. **角色档案**：识别主要角色（前 10-15 名），填写 `.webnovel/canon/characters/{name}.md`
+   - 使用 `设定集-原作角色卡.md` 模板格式
+   - 重点提取：性格内核、说话风格、行为模式、关键关系
+
+2. **力量体系**：填充 `.webnovel/canon/power_system.md`
+   - 等级划分、突破规则、能力体系
+
+3. **世界观**：填充 `.webnovel/canon/world.md`
+   - 世界结构、势力格局、社会规则
+
+4. **关系网络**：填充 `.webnovel/canon/relationships.md`
+   - 主要角色间的关系图谱
+
+5. **时间线**：填充 `.webnovel/canon/timeline.md`
+   - 原作关键事件时间线
+
+提取策略：
+- 分段读取原作（每次 3-5 章），逐步积累信息。
+- 对每个角色，优先提取「说话方式」和「行为模式」（同人 OOC 检查的关键依据）。
+- 提取完毕后，向用户展示摘要供确认。
+
+### 同人 Step 3：Canon 偏离声明
+
+引导用户填写 `设定集/Canon偏离声明.md`：
+
+1. 展示已提取的 Canon 要素清单。
+2. 逐项询问：保留 / 修改 / 不涉及。
+3. 对标记为"修改"的项，收集 AU 改造说明和理由。
+4. 收集新增设定。
+5. 确认 Canon 红线（绝不可违反的要素）。
+
+### 同人 Step 4：同人故事核心
+
+类似原创 Step 1，但增加同人特有信息：
+
+收集项（必收）：
+- 同人作品标题
+- 同人卖点（对原作的什么进行再创作？为什么读者要看这个同人？）
+- 目标规模（总字数/总章数）
+- 核心冲突（可基于原作冲突改造）
+- 主角选择（复用原作角色 / 原创 OC / 原作角色+OC 混合）
+
+### 同人 Step 5：角色设定与重塑
+
+根据主角选择：
+
+**复用原作角色为主角**：
+- 从 `.webnovel/canon/characters/` 导入角色档案
+- 用户确认保留/修改的性格特征
+- 生成 `设定集/主角卡.md`（基于 Canon 档案 + AU 改造）
+
+**原创 OC 主角**：
+- 正常收集主角三要素（欲望/缺陷/原型）
+- 额外收集：OC 与原作世界的融合方案
+
+### 同人 Step 6：确认生成
+
+输出"同人初始化摘要草案"：
+- 原作信息
+- Canon 偏离声明摘要
+- 同人故事核心
+- 主角设定
+- AU 世界观改造要点
+
+用户确认后执行生成。
+
+---
 
 ### Step 0：预检与上下文加载
 
@@ -321,6 +426,12 @@ export SCRIPTS_DIR="${CLAUDE_PLUGIN_ROOT}/scripts"
    - 硬约束至少 2 条
    - 或用户明确拒绝并记录原因。
 
+**同人模式额外条件**（mode=fan_fiction 时需满足）：
+
+7. 原作 TXT 已导入且 Canon 资料提取完成。
+8. Canon 偏离声明已填写（至少声明了保留清单和 Canon 红线）。
+9. 同人卖点已明确。
+
 ## 项目目录安全规则（必须）
 
 - `project_root` 必须由书名安全化生成（去非法字符，空格转 `-`）。
@@ -370,6 +481,14 @@ python "${SCRIPTS_DIR}/webnovel.py" init \
   --platform "{platform}"
 ```
 
+**同人模式额外参数**：
+```bash
+  --mode fan_fiction \
+  --canon-source "{canon_source}" \
+  --canon-type "{canon_type}" \
+  --canon-txt-path "{canon_txt_path}"
+```
+
 ### 2) 写入 `idea_bank.json`
 
 写入 `.webnovel/idea_bank.json`：
@@ -417,6 +536,11 @@ test -f "{project_root}/.webnovel/idea_bank.json"
 - 设定集核心文件存在：`世界观.md`、`力量体系.md`、`主角卡.md`、`金手指设计.md`。
 - `总纲.md` 已填核心主线与约束字段。
 - `idea_bank.json` 已写入且与最终选定方案一致。
+
+**同人模式额外标准**：
+- `.webnovel/canon/source_meta.json` 存在且角色提取数 > 0。
+- `设定集/Canon偏离声明.md` 已填写保留清单和 Canon 红线。
+- Canon 角色档案至少 3 个已填充。
 
 ## 失败处理（最小回滚）
 

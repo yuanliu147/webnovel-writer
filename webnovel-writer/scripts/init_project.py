@@ -261,6 +261,10 @@ def init_project(
     sect_hierarchy: str = "",
     cultivation_chain: str = "",
     cultivation_subtiers: str = "",
+    mode: str = "original",
+    canon_source: str = "",
+    canon_type: str = "AU",
+    canon_txt_path: str = "",
 ) -> None:
     project_path = Path(project_dir).expanduser().resolve()
     if ".claude" in project_path.parts:
@@ -281,6 +285,13 @@ def init_project(
         "正文",
         "审查报告",
     ]
+    # 同人模式额外目录
+    if mode == "fan_fiction":
+        directories.extend([
+            ".webnovel/canon/characters",
+            ".webnovel/canon/source_chapters",
+        ])
+
     for dir_path in directories:
         (project_path / dir_path).mkdir(parents=True, exist_ok=True)
 
@@ -301,6 +312,7 @@ def init_project(
         {
             "title": title,
             "genre": genre,
+            "mode": mode,
             "created_at": created_at,
             "target_words": int(target_words),
             "target_chapters": int(target_chapters),
@@ -332,6 +344,19 @@ def init_project(
             "cultivation_subtiers": cultivation_subtiers,
         }
     )
+
+    # 同人模式元信息
+    if mode == "fan_fiction":
+        state["fan_fiction_meta"] = state.get("fan_fiction_meta", {
+            "canon_source": canon_source,
+            "canon_type": canon_type,
+            "canon_txt_path": canon_txt_path,
+            "canon_retained": [],
+            "canon_modified": [],
+            "canon_added": [],
+        })
+        state["fan_fiction_meta"]["canon_source"] = canon_source
+        state["fan_fiction_meta"]["canon_type"] = canon_type
 
     if protagonist_name:
         state["protagonist_state"]["name"] = protagonist_name
@@ -624,6 +649,40 @@ def init_project(
             antagonist_content = "\n".join(out_lines)
     _write_text_if_missing(project_path / "设定集" / "反派设计.md", antagonist_content)
 
+    # 同人模式：生成 Canon 参照模板
+    if mode == "fan_fiction":
+        output_canon_deviation = _read_text_if_exists(output_templates_dir / "设定集-Canon偏离声明.md")
+        output_canon_character = _read_text_if_exists(output_templates_dir / "设定集-原作角色卡.md")
+        output_canon_world = _read_text_if_exists(output_templates_dir / "设定集-原作世界观.md")
+
+        if output_canon_deviation:
+            canon_deviation_content = _apply_label_replacements(
+                output_canon_deviation,
+                {"原作名称": canon_source, "同人类型": canon_type},
+            )
+            _write_text_if_missing(project_path / "设定集" / "Canon偏离声明.md", canon_deviation_content)
+
+        if output_canon_world:
+            canon_world_content = _apply_label_replacements(
+                output_canon_world,
+                {"作品名": canon_source},
+            )
+            _write_text_if_missing(project_path / ".webnovel" / "canon" / "world.md", canon_world_content)
+
+        # 生成 canon 骨架文件
+        _write_text_if_missing(
+            project_path / ".webnovel" / "canon" / "power_system.md",
+            f"# {canon_source} - 原作力量体系\n\n> 由 AI 解析原作 TXT 后自动填充。\n\n## 等级划分\n\n## 能力规则\n\n## 硬限制\n",
+        )
+        _write_text_if_missing(
+            project_path / ".webnovel" / "canon" / "relationships.md",
+            f"# {canon_source} - 原作关系网络\n\n> 由 AI 解析原作 TXT 后自动填充。\n\n## 主要关系\n\n## 阵营划分\n",
+        )
+        _write_text_if_missing(
+            project_path / ".webnovel" / "canon" / "timeline.md",
+            f"# {canon_source} - 原作时间线\n\n> 由 AI 解析原作 TXT 后自动填充。\n\n## 关键事件\n",
+        )
+
     outline_content = output_outline.strip() if output_outline else ""
     if outline_content:
         outline_content = _inject_volume_rows(outline_content, int(target_chapters)).rstrip() + "\n"
@@ -752,6 +811,9 @@ __pycache__/
     print(" - 设定集/金手指设计.md")
     print(" - 大纲/总纲.md")
     print(" - 大纲/爽点规划.md")
+    if mode == "fan_fiction":
+        print(f" - 设定集/Canon偏离声明.md")
+        print(f" - .webnovel/canon/ (原作资料目录)")
 
 
 def main() -> None:
@@ -762,6 +824,13 @@ def main() -> None:
         "genre",
         help="题材类型（可用“+”组合，如：都市脑洞+规则怪谈；示例：修仙/系统流/都市异能/古言/现实题材）",
     )
+
+    parser.add_argument("--mode", default="original", choices=["original", "fan_fiction"], help="创作模式（original=原创, fan_fiction=同人）")
+
+    # 同人模式参数
+    parser.add_argument("--canon-source", default="", help="原作名称（同人模式）")
+    parser.add_argument("--canon-type", default="AU", help="同人类型（AU/插入/融合）")
+    parser.add_argument("--canon-txt-path", default="", help="原作 TXT 文件路径（同人模式）")
 
     parser.add_argument("--protagonist-name", default="", help="主角姓名")
     parser.add_argument("--target-words", type=int, default=2_000_000, help="目标总字数（默认 2000000）")
@@ -837,6 +906,10 @@ def main() -> None:
         sect_hierarchy=args.sect_hierarchy,
         cultivation_chain=args.cultivation_chain,
         cultivation_subtiers=args.cultivation_subtiers,
+        mode=args.mode,
+        canon_source=args.canon_source,
+        canon_type=args.canon_type,
+        canon_txt_path=args.canon_txt_path,
     )
 
 

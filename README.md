@@ -23,8 +23,8 @@
 ### 1) 安装插件（官方 Marketplace）
 
 ```bash
-claude plugin marketplace add lingfengQAQ/webnovel-writer --scope user
-claude plugin install webnovel-writer@webnovel-writer-marketplace --scope user
+claude plugin marketplace add yuanliu147/webnovel-writer --scope project
+claude plugin install webnovel-writer@webnovel-writer-marketplace --scope project
 ```
 
 > 仅当前项目生效时，将 `--scope user` 改为 `--scope project`。
